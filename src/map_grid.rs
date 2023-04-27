@@ -1,6 +1,10 @@
+use num_traits::Zero;
+
 use crate::node::Node;
 use crate::node_status::NodeStatus;
 use crate::score::Score;
+
+const DELTA: f64 = 1e-07;
 
 #[derive(Clone, Debug, Default)]
 pub struct MapGrid {
@@ -15,8 +19,8 @@ pub struct MapGrid {
 
 impl MapGrid {
     pub fn new(min_point: (f64, f64), max_point: (f64, f64), resolution: f64) -> Self {
-        let x_len = ((max_point.0 - min_point.0) / resolution) as usize;
-        let y_len = ((max_point.1 - min_point.1) / resolution) as usize;
+        let x_len = ((max_point.0 - min_point.0) / resolution + DELTA) as usize;
+        let y_len = ((max_point.1 - min_point.1) / resolution + DELTA) as usize;
         let node_map = vec![vec![Node::default(); x_len]; y_len];
         Self {
             min_point,
@@ -43,8 +47,8 @@ impl MapGrid {
             Err("Start has already set.".to_string())
         } else {
             // TODO: Check index is valid or not.
-            let idx = ((x - self.min_point.0) / self.resolution) as usize;
-            let idy = ((y - self.min_point.1) / self.resolution) as usize;
+            let idx = ((x - self.min_point.0) / self.resolution + DELTA) as usize;
+            let idy = ((y - self.min_point.1) / self.resolution + DELTA) as usize;
             self.node_map[idy][idx] = Node {
                 status: NodeStatus::Start,
                 score: Some(Score {
@@ -62,18 +66,17 @@ impl MapGrid {
             Err("Goal has already set.".to_string())
         } else {
             // TODO: Check index is valid or not.
-            let idx = ((x - self.min_point.0) / self.resolution) as usize;
-            let idy = ((y - self.min_point.1) / self.resolution) as usize;
+            let idx = ((x - self.min_point.0) / self.resolution + DELTA) as usize;
+            let idy = ((y - self.min_point.1) / self.resolution + DELTA) as usize;
             self.node_map[idy][idx].status = NodeStatus::Goal;
             Ok(())
         }
     }
 
     pub fn set_obstacle(&mut self, obstacles: &[(f64, f64)]) {
-        let delta = 1e-07;
         for &o in obstacles {
-            let idx = ((o.0 - self.min_point.0 + delta) / self.resolution) as usize;
-            let idy = ((o.1 - self.min_point.1 + delta) / self.resolution) as usize;
+            let idx = ((o.0 - self.min_point.0 + DELTA) / self.resolution) as usize;
+            let idy = ((o.1 - self.min_point.1 + DELTA) / self.resolution) as usize;
             println!("{},{} --> {},{}", o.0, o.1, idx, idy);
             self.node_map[idy][idx] = Node {
                 status: NodeStatus::Disable,
@@ -168,22 +171,7 @@ impl MapGrid {
 
         while current != start {
             let mut min_id = (current.0 + 1, current.1 + 1);
-            if current.0 != self.node_map.len() - 1 {
-                if current.1 != self.node_map[0].len() - 1 {
-                } else if current.1 != 0 {
-                } else {
-                }
-            } else if current.0 != 0 {
-                if current.1 != self.node_map[0].len() - 1 {
-                } else if current.1 != 0 {
-                } else {
-                }
-            } else {
-                if current.1 != self.node_map[0].len() - 1 {
-                } else if current.1 != 0 {
-                } else {
-                }
-            }
+            let aaa = current.0.wrapping_sub(1);
         }
 
         path
