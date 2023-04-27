@@ -54,7 +54,7 @@ impl MapGrid {
         }
     }
 
-    pub fn set_wall(&mut self, walls: &[(usize, usize)]) {
+    pub fn set_obstacle(&mut self, walls: &[(usize, usize)]) {
         for &wall in walls {
             self.0[wall.0][wall.1] = Node {
                 status: NodeStatus::Disable,
