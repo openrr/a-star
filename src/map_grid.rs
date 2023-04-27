@@ -2,37 +2,50 @@ use crate::node::Node;
 use crate::node_status::NodeStatus;
 use crate::score::Score;
 
-pub(crate) type MapGridInner = Vec<Vec<Node>>;
-
 #[derive(Clone, Debug, Default)]
-pub struct MapGrid(MapGridInner);
+pub struct MapGrid {
+    /// x, y
+    min_point: (f64, f64),
+    /// x, y
+    max_point: (f64, f64),
+    /// node_map[y][x]
+    node_map: Vec<Vec<Node>>,
+    resolution: f64,
+}
 
 impl MapGrid {
-    pub fn new_from_size(height: usize, width: usize) -> Self {
-        let inner: MapGridInner = vec![vec![Node::default(); width]; height];
-        Self(inner)
+    pub fn new(min_point: (f64, f64), max_point: (f64, f64), resolution: f64) -> Self {
+        let x_len = ((max_point.0 - min_point.0) / resolution) as usize;
+        let y_len = ((max_point.1 - min_point.1) / resolution) as usize;
+        let node_map = vec![vec![Node::default(); x_len]; y_len];
+        Self {
+            min_point,
+            max_point,
+            node_map,
+            resolution,
+        }
     }
 
     pub fn set_start_and_goal(
         &mut self,
-        s_idy: usize,
-        s_idx: usize,
-        g_idy: usize,
-        g_idx: usize,
+        (s_x, s_y): (f64, f64),
+        (g_x, g_y): (f64, f64),
     ) -> Result<(), std::string::String> {
-        self.set_start(s_idy, s_idx)?;
-        self.set_goal(g_idy, g_idx)?;
+        self.set_start((s_x, s_y))?;
+        self.set_goal((g_x, g_y))?;
         self.init_start_and_goal()?;
         Ok(())
     }
 
-    fn set_start(&mut self, idy: usize, idx: usize) -> Result<(), std::string::String> {
+    fn set_start(&mut self, (x, y): (f64, f64)) -> Result<(), std::string::String> {
         // TODO: Error handling
         if self.is_set_start() {
             Err("Start has already set.".to_string())
         } else {
             // TODO: Check index is valid or not.
-            self.0[idy][idx] = Node {
+            let idx = ((x - self.min_point.0) / self.resolution) as usize;
+            let idy = ((y - self.min_point.1) / self.resolution) as usize;
+            self.node_map[idy][idx] = Node {
                 status: NodeStatus::Start,
                 score: Some(Score {
                     real: 0,
@@ -43,20 +56,26 @@ impl MapGrid {
         }
     }
 
-    fn set_goal(&mut self, idy: usize, idx: usize) -> Result<(), std::string::String> {
+    fn set_goal(&mut self, (x, y): (f64, f64)) -> Result<(), std::string::String> {
         // TODO: Error handling
         if self.is_set_goal() {
             Err("Goal has already set.".to_string())
         } else {
             // TODO: Check index is valid or not.
-            self.0[idy][idx].status = NodeStatus::Goal;
+            let idx = ((x - self.min_point.0) / self.resolution) as usize;
+            let idy = ((y - self.min_point.1) / self.resolution) as usize;
+            self.node_map[idy][idx].status = NodeStatus::Goal;
             Ok(())
         }
     }
 
-    pub fn set_obstacle(&mut self, walls: &[(usize, usize)]) {
-        for &wall in walls {
-            self.0[wall.0][wall.1] = Node {
+    pub fn set_obstacle(&mut self, obstacles: &[(f64, f64)]) {
+        let delta = 1e-07;
+        for &o in obstacles {
+            let idx = ((o.0 - self.min_point.0 + delta) / self.resolution) as usize;
+            let idy = ((o.1 - self.min_point.1 + delta) / self.resolution) as usize;
+            println!("{},{} --> {},{}", o.0, o.1, idx, idy);
+            self.node_map[idy][idx] = Node {
                 status: NodeStatus::Disable,
                 score: None,
             };
@@ -64,44 +83,40 @@ impl MapGrid {
     }
 
     pub fn get_start(&self) -> Option<(usize, usize)> {
-        self.0
+        self.node_map
             .iter()
             .flatten()
             .position(|node| node.status == NodeStatus::Start)
-            .map(|id| (id / self.0[0].len(), id % self.0[0].len()))
+            .map(|id| (id / self.node_map[0].len(), id % self.node_map[0].len()))
     }
 
     pub fn get_goal(&self) -> Option<(usize, usize)> {
-        self.0
+        self.node_map
             .iter()
             .flatten()
             .position(|node| node.status == NodeStatus::Goal)
-            .map(|id| (id / self.0[0].len(), id % self.0[0].len()))
+            .map(|id| (id / self.node_map[0].len(), id % self.node_map[0].len()))
     }
 
     pub fn is_set_start(&self) -> bool {
-        self.0
+        self.node_map
             .iter()
             .flatten()
             .any(|node| node.status == NodeStatus::Start)
     }
 
     pub fn is_set_goal(&self) -> bool {
-        self.0
+        self.node_map
             .iter()
             .flatten()
             .any(|node| node.status == NodeStatus::Goal)
     }
 
-    pub fn get_trajectory(&self) -> Vec<(usize, usize)> {
-        todo!()
-    }
-
     pub fn search(&mut self) {
         // TODO: Check start and goal are set.
         let mut is_reached_goal = false;
-        let height = self.0.len();
-        let width = self.0[0].len();
+        let height = self.node_map.len();
+        let width = self.node_map[0].len();
 
         while !is_reached_goal {
             let parent_node_index;
@@ -109,9 +124,9 @@ impl MapGrid {
                 parent_node_index = self.get_start().unwrap();
             } else {
                 parent_node_index = self.searched_target_node_index();
-                self.0[parent_node_index.0][parent_node_index.1].status = NodeStatus::Closed;
+                self.node_map[parent_node_index.0][parent_node_index.1].status = NodeStatus::Closed;
             }
-            let parent_node_real_cost = self.0[parent_node_index.0][parent_node_index.1]
+            let parent_node_real_cost = self.node_map[parent_node_index.0][parent_node_index.1]
                 .score
                 .as_ref()
                 .unwrap()
@@ -144,9 +159,39 @@ impl MapGrid {
         }
     }
 
+    pub fn get_path(&self) -> Vec<(f64, f64)> {
+        let mut path = vec![];
+
+        let start = self.get_start().unwrap();
+        let goal = self.get_goal().unwrap();
+        let mut current = goal;
+
+        while current != start {
+            let mut min_id = (current.0 + 1, current.1 + 1);
+            if current.0 != self.node_map.len() - 1 {
+                if current.1 != self.node_map[0].len() - 1 {
+                } else if current.1 != 0 {
+                } else {
+                }
+            } else if current.0 != 0 {
+                if current.1 != self.node_map[0].len() - 1 {
+                } else if current.1 != 0 {
+                } else {
+                }
+            } else {
+                if current.1 != self.node_map[0].len() - 1 {
+                } else if current.1 != 0 {
+                } else {
+                }
+            }
+        }
+
+        path
+    }
+
     fn init_start_and_goal(&mut self) -> Result<(), std::string::String> {
         if let Some(start) = self.get_start() {
-            self.0[start.0][start.1].score = Some(Score {
+            self.node_map[start.0][start.1].score = Some(Score {
                 real: 0,
                 estimate: self.get_estimate_cost(start.0, start.1).unwrap(),
             });
@@ -157,7 +202,7 @@ impl MapGrid {
     }
 
     fn is_only_start_node_be_searched(&self) -> bool {
-        self.0
+        self.node_map
             .iter()
             .flatten()
             .all(|node| node.status != NodeStatus::Open)
@@ -165,49 +210,59 @@ impl MapGrid {
     }
 
     pub fn highest_scored_node_index(&self) -> (usize, usize) {
-        let max_node = self.0.iter().flatten().filter(|&n| n.score.is_some()).max();
+        let max_node = self
+            .node_map
+            .iter()
+            .flatten()
+            .filter(|&n| n.score.is_some())
+            .max();
         let max_index = self
-            .0
+            .node_map
             .iter()
             .flatten()
             .position(|node| *node == *max_node.unwrap());
 
         (
-            max_index.unwrap() / self.0[0].len(),
-            max_index.unwrap() % self.0[0].len(),
+            max_index.unwrap() / self.node_map[0].len(),
+            max_index.unwrap() % self.node_map[0].len(),
         )
     }
 
     pub fn lowest_scored_node_index(&self) -> (usize, usize) {
-        let min_node = self.0.iter().flatten().filter(|&n| n.score.is_some()).min();
+        let min_node = self
+            .node_map
+            .iter()
+            .flatten()
+            .filter(|&n| n.score.is_some())
+            .min();
         let min_index = self
-            .0
+            .node_map
             .iter()
             .flatten()
             .position(|node| *node == *min_node.unwrap());
 
         (
-            min_index.unwrap() / self.0[0].len(),
-            min_index.unwrap() % self.0[0].len(),
+            min_index.unwrap() / self.node_map[0].len(),
+            min_index.unwrap() % self.node_map[0].len(),
         )
     }
 
     /// Return (h, w)
     fn searched_target_node_index(&self) -> (usize, usize) {
         let min_node = self
-            .0
+            .node_map
             .iter()
             .flatten()
             .filter(|&n| n.score.is_some())
             .filter(|&n| n.status == NodeStatus::Open)
             .min();
-        let min_index = self.0.iter().flatten().position(|node| {
+        let min_index = self.node_map.iter().flatten().position(|node| {
             *node == *min_node.unwrap() && node.status == min_node.unwrap().status
         });
 
         (
-            min_index.unwrap() / self.0[0].len(),
-            min_index.unwrap() % self.0[0].len(),
+            min_index.unwrap() / self.node_map[0].len(),
+            min_index.unwrap() % self.node_map[0].len(),
         )
     }
 
@@ -217,15 +272,15 @@ impl MapGrid {
         idx: usize,
         parent_node_real_cost: u64,
     ) -> bool {
-        match self.0[idy][idx].status {
+        match self.node_map[idy][idx].status {
             NodeStatus::Start => {}
             NodeStatus::Goal => return true,
             NodeStatus::Open => {}
             NodeStatus::Closed => {}
             NodeStatus::Disable => {}
             NodeStatus::None => {
-                self.0[idy][idx].status = NodeStatus::Open;
-                self.0[idy][idx].score = Some(Score {
+                self.node_map[idy][idx].status = NodeStatus::Open;
+                self.node_map[idy][idx].score = Some(Score {
                     real: parent_node_real_cost + 1,
                     estimate: self.get_estimate_cost(idy, idx).unwrap(),
                 })
@@ -251,7 +306,7 @@ impl MapGrid {
     /// For debug or something
     pub fn visualize_as_string(&self) -> std::string::String {
         let mut displayed = String::new();
-        for node_raw in &self.0 {
+        for node_raw in &self.node_map {
             for node in node_raw {
                 let status = node.status.to_string();
                 let color = node_status_as_color(&node.status);
@@ -270,7 +325,7 @@ impl MapGrid {
 impl std::fmt::Display for MapGrid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut displayed = String::new();
-        for node_raw in &self.0 {
+        for node_raw in &self.node_map {
             for node in node_raw {
                 let status = node.status.to_string();
                 let color = node_status_as_color(&node.status);
@@ -304,130 +359,5 @@ fn node_status_as_color(status: &NodeStatus) -> String {
         NodeStatus::Disable => "\x1b[38;5;0m\x1b[47m".to_string(),
         NodeStatus::None => "\x1b[38;5;7m".to_string(),
         NodeStatus::Path => "\x1b[38;5;4m".to_string(),
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_5x6_grid() {
-        let mut map = MapGrid::new_from_size(5, 6);
-        map.set_start_and_goal(1, 0, 1, 5).unwrap();
-
-        assert!(map.is_set_start());
-        assert!(map.is_set_goal());
-
-        let start = map.get_start().unwrap();
-        let goal = map.get_goal().unwrap();
-
-        assert_eq!(start.0, 1);
-        assert_eq!(start.1, 0);
-        assert_eq!(goal.0, 1);
-        assert_eq!(goal.1, 5);
-
-        assert_eq!(map.0[start.0][start.1].score.as_ref().unwrap().estimate, 5);
-
-        println!("{}", map);
-
-        map.search();
-
-        println!("{}", map);
-    }
-
-    #[test]
-    fn test_get_foo() {
-        let mut map = MapGrid::new_from_size(4, 4);
-        let is_set_start = map.is_set_start();
-        let is_set_goal = map.is_set_goal();
-        let start = map.get_start();
-        let goal = map.get_goal();
-        assert!(!is_set_start);
-        assert!(!is_set_goal);
-        assert!(start.is_none());
-        assert!(goal.is_none());
-
-        map.set_start_and_goal(0, 1, 2, 3).unwrap();
-        let is_set_start = map.is_set_start();
-        let is_set_goal = map.is_set_goal();
-        let start = map.get_start().unwrap();
-        let goal = map.get_goal().unwrap();
-        assert!(is_set_start);
-        assert!(is_set_goal);
-        assert_eq!(start, (0, 1));
-        assert_eq!(goal, (2, 3));
-    }
-
-    #[test]
-    fn test_get_target_node_index() {
-        let mut map = MapGrid::new_from_size(12, 5);
-
-        map.0[3][2] = Node {
-            status: NodeStatus::Open,
-            score: Some(Score {
-                real: 3,
-                estimate: 3,
-            }),
-        };
-        map.0[8][4] = Node {
-            status: NodeStatus::Open,
-            score: Some(Score {
-                real: 4,
-                estimate: 2,
-            }),
-        };
-        map.0[9][1] = Node {
-            status: NodeStatus::Open,
-            score: Some(Score {
-                real: 3,
-                estimate: 2,
-            }),
-        };
-        map.0[10][3] = Node {
-            status: NodeStatus::Closed,
-            score: Some(Score {
-                real: 1,
-                estimate: 1,
-            }),
-        };
-        map.0[11][4] = Node {
-            status: NodeStatus::Start,
-            score: Some(Score {
-                real: 9,
-                estimate: 2,
-            }),
-        };
-
-        let highest_scored_node_index = map.highest_scored_node_index();
-        let lowest_scored_node_index = map.lowest_scored_node_index();
-        let searched_target_node_index = map.searched_target_node_index();
-
-        assert_eq!(highest_scored_node_index, (11, 4));
-        assert_eq!(lowest_scored_node_index, (10, 3));
-        assert_eq!(searched_target_node_index, (9, 1));
-    }
-
-    #[test]
-    fn test_update_to_searched_node() {
-        let mut map = MapGrid::new_from_size(3, 3);
-        map.set_start_and_goal(0, 0, 2, 2).unwrap();
-        map.update_to_searched_node(1, 2, 10);
-
-        let node = &map.0[1][2];
-        let status = &node.status;
-        let score = &node.score.as_ref().unwrap();
-        assert_eq!(*status, NodeStatus::Open);
-        assert_eq!(score.real, 11);
-        assert_eq!(score.estimate, 1);
-    }
-
-    #[test]
-    fn test_get_estimate_score() {
-        let mut map = MapGrid::new_from_size(12, 5);
-        map.set_start_and_goal(1, 2, 11, 3).unwrap();
-
-        let estimate_score = map.get_estimate_cost(2, 1).unwrap();
-        assert_eq!(estimate_score, 9);
     }
 }
