@@ -1,9 +1,9 @@
-use a_star::AStar;
+use a_star::*;
 
 fn main() {    let min = (-1.0, 1.0);
     let max = (1.0, 2.0);
     let resolution = 0.05;
-    let mut map = AStar::new(min, max, resolution);
+    let mut map = MapGrid::new(min, max, resolution);
 
     map.set_start_and_goal((-0.8, 0.1), (0.05, 1.9)).unwrap();
 

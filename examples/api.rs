@@ -1,20 +1,7 @@
 use a_star::*;
 
 fn main() {
-    let min = (-1.0, 1.0);
-    let max = (1.0, 2.0);
-    let resolution = 0.05;
-    let mut map = MapGrid::new(min, max, resolution);
-    let obstacles = new_obstacle_map(min, resolution);
-
-    map.set_start_and_goal((-0.8, 0.1), (0.05, 1.9)).unwrap();
-    map.set_obstacle(&obstacles);
-
-    println!("{}", map.visualize_as_string());
-
-    map.search();
-
-    println!("{}", map.visualize_as_string());
+    let result = a_star(start, goal, min_point, max_point, resolution, obstacle);
 }
 
 fn new_obstacle_map(min: (f64, f64), resolution: f64) -> Vec<(f64, f64)> {

@@ -4,5 +4,5 @@ mod node_status;
 mod score;
 mod api;
 
-pub use map_grid::MapGrid as AStar;
+pub use map_grid::*;
 pub use api::*;
