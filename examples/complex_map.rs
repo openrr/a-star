@@ -5,7 +5,19 @@ fn main() {
     let max = (1.0, 2.0);
     let resolution = 0.05;
     let mut map = AStar::new(min, max, resolution);
+    let obstacles = new_obstacle_map(min, max, resolution);
 
+    map.set_start_and_goal((-0.8, 0.1), (0.05, 1.9)).unwrap();
+    map.set_obstacle(&obstacles);
+
+    println!("{}", map.visualize_as_string());
+
+    map.search();
+
+    println!("{}", map.visualize_as_string());
+}
+
+fn new_obstacle_map(min: (f64, f64), max: (f64, f64), resolution: f64) -> Vec<(f64, f64)> {
     let mut obstacle = vec![];
     for i in 0..15 {
         obstacle.push((
@@ -21,12 +33,5 @@ fn main() {
         obstacle.push((i as f64 * resolution + min.0, 10. * resolution + min.1));
     }
 
-    map.set_start_and_goal((-0.8, 0.1), (0.05, 1.9)).unwrap();
-    map.set_obstacle(&obstacle);
-
-    println!("{}", map.visualize_as_string());
-
-    map.search();
-
-    println!("{}", map.visualize_as_string());
+    obstacle
 }

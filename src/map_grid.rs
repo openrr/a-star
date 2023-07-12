@@ -1,5 +1,3 @@
-use num_traits::Zero;
-
 use crate::node::Node;
 use crate::node_status::NodeStatus;
 use crate::score::Score;
@@ -157,8 +155,11 @@ impl MapGrid {
 
             // For debug
             // TODO: Remove
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            println!("{}", self.visualize_as_string());
+            #[cfg(feature = "develop")]
+            {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                println!("{}", self.visualize_as_string());
+            }
         }
     }
 
