@@ -6,3 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# grid_map = { git = "https://github.com/openrr/grid_map" }
+grid_map = { path = "../grid_map/grid_map" }
+assert_approx_eq = "1.1"
+
+[[bin]]
+name = "astar"
+path = "src/bin/astar.rs"
